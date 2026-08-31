@@ -417,42 +417,53 @@
             return;
         }
 
-        // Try API 1: ipapi.co via CorsProxy
+        // Method 1: Direct HTTPS Fetch to ipwho.is
         try {
-            const primaryUrl = cleanIP 
-                ? `https://corsproxy.io/?https://ipapi.co/${cleanIP}/json/`
-                : `https://corsproxy.io/?https://ipapi.co/json/`;
+            const url = cleanIP ? `https://ipwho.is/${cleanIP}` : `https://ipwho.is/`;
+            const res = await fetch(url);
+            const data = await res.json();
 
-            const res = await fetch(primaryUrl);
+            if (data.success) {
+                renderData(
+                    data.ip,
+                    data.city,
+                    data.region,
+                    data.country,
+                    data.connection ? data.connection.isp : "N/A",
+                    data.timezone ? data.timezone.id : "N/A",
+                    data.latitude,
+                    data.longitude
+                );
+                return;
+            }
+        } catch (e) {
+            console.warn("ipwho.is failed, trying ipapi.co...");
+        }
+
+        // Method 2: Direct Fetch to ipapi.co
+        try {
+            const url = cleanIP ? `https://ipapi.co/${cleanIP}/json/` : `https://ipapi.co/json/`;
+            const res = await fetch(url);
             const data = await res.json();
 
             if (!data.error && data.ip) {
-                renderData(data.ip, data.city, data.region, data.country_name, data.org, data.timezone, data.latitude, data.longitude);
+                renderData(
+                    data.ip,
+                    data.city,
+                    data.region,
+                    data.country_name,
+                    data.org,
+                    data.timezone,
+                    data.latitude,
+                    data.longitude
+                );
                 return;
             }
-        } catch(e) {
-            console.warn("Primary API failed, switching to Fallback API...");
+        } catch (e) {
+            console.error("ipapi.co also failed.");
         }
 
-        // Fallback API 2: ip-api.com via AllOrigins
-        try {
-            const fallbackUrl = cleanIP 
-                ? `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/' + cleanIP)}`
-                : `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/')}`;
-
-            const res = await fetch(fallbackUrl);
-            const wrapper = await res.json();
-            const data = JSON.parse(wrapper.contents);
-
-            if (data.status === "success" || data.query) {
-                renderData(data.query, data.city, data.regionName, data.country, data.isp, data.timezone, data.lat, data.lon);
-                return;
-            }
-        } catch(e) {
-            console.error("All APIs failed.");
-        }
-
-        // If both failed
+        // Final Failure State
         setStatus("Connection Error", "red");
         updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
         document.getElementById("res-ping").innerText = "Error";
