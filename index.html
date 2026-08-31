@@ -157,6 +157,13 @@
 <script>
     const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nXud_JJ_GkFFp2Ql_S_iBWWHMxNZh1JZSrnvepMa0gtTRFV2SCBzf3SKSSzxvEIQ1A/exec";
 
+    function isPrivateIP(ip) {
+        return ip.startsWith("10.") || 
+               ip.startsWith("192.168.") || 
+               ip.startsWith("127.") || 
+               (ip.startsWith("172.") && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31);
+    }
+
     function setStatus(text, color) {
         const statusBar = document.getElementById("statusBar");
         statusBar.innerText = "Status: " + text;
@@ -186,10 +193,27 @@
     }
 
     async function fetchIPDetails(targetIP = "") {
+        const cleanIP = targetIP.trim();
         setStatus("Loading...", "gray");
+
+        // Handle Private IP Range
+        if (cleanIP && isPrivateIP(cleanIP)) {
+            updateTable(cleanIP, "Local Network (LAN)", "Private IP", "Internal Network", "Private Device", "Local Time");
+            setStatus("Local IP Found", "blue");
+            sendToDrive({
+                ip: cleanIP,
+                city: "Local Network",
+                region: "Private IP",
+                country: "Internal Network",
+                isp: "Private Device",
+                timezone: "Local Time"
+            });
+            return;
+        }
+
         try {
-            const url = targetIP.trim() 
-                ? `https://ipapi.co/${targetIP.trim()}/json/` 
+            const url = cleanIP 
+                ? `https://ipapi.co/${cleanIP}/json/` 
                 : `https://ipapi.co/json/`;
 
             const response = await fetch(url);
@@ -209,20 +233,18 @@
             updateTable(data.ip, data.city, data.region, data.country_name, data.org, data.timezone);
             setStatus("Active", "green");
 
-            const drivePayload = {
+            sendToDrive({
                 ip: data.ip || 'N/A',
                 city: data.city || 'N/A',
                 region: data.region || 'N/A',
                 country: data.country_name || 'N/A',
                 isp: data.org || 'N/A',
                 timezone: data.timezone || 'N/A'
-            };
-            
-            sendToDrive(drivePayload);
+            });
 
         } catch (error) {
             setStatus("Network Error", "red");
-            alert("Error connecting to API! Make sure the IP or domain is correct.");
+            alert("Error connecting to API!");
         }
     }
 
