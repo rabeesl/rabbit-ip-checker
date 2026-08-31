@@ -127,7 +127,7 @@
     <div class="search-section">
         <label>Search External IP or Domain:</label>
         <div class="search-box">
-            <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8 or google.com">
+            <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8 or 192.168.8.170">
             <button class="btn-search" onclick="searchIP()">🔍 Search IP</button>
         </div>
     </div>
@@ -161,6 +161,7 @@
         return ip.startsWith("10.") || 
                ip.startsWith("192.168.") || 
                ip.startsWith("127.") || 
+               ip.startsWith("169.254.") ||
                (ip.startsWith("172.") && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31);
     }
 
@@ -196,37 +197,33 @@
         const cleanIP = targetIP.trim();
         setStatus("Loading...", "gray");
 
-        // Handle Private IP Range
+        // 1. Check for Private IP Range (LAN)
         if (cleanIP && isPrivateIP(cleanIP)) {
-            updateTable(cleanIP, "Local Network (LAN)", "Private IP", "Internal Network", "Private Device", "Local Time");
-            setStatus("Local IP Found", "blue");
+            updateTable(cleanIP, "Local Network (LAN)", "Internal IP", "Private Network", "Local Router/Device", "System Time");
+            setStatus("Local Private IP Detected", "blue");
             sendToDrive({
                 ip: cleanIP,
                 city: "Local Network",
-                region: "Private IP",
-                country: "Internal Network",
-                isp: "Private Device",
-                timezone: "Local Time"
+                region: "Internal IP",
+                country: "Private Network",
+                isp: "Local Router/Device",
+                timezone: "System Time"
             });
             return;
         }
 
+        // 2. Fetch Public IP Details
         try {
             const url = cleanIP 
                 ? `https://ipapi.co/${cleanIP}/json/` 
                 : `https://ipapi.co/json/`;
 
             const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error("Invalid Response");
-            }
-
             const data = await response.json();
 
             if (data.error) {
-                setStatus("Invalid IP/Domain", "red");
-                alert("Invalid IP address or domain!");
+                setStatus("Invalid IP or Hostname", "red");
+                updateTable(cleanIP || "Invalid", "N/A", "N/A", "N/A", "N/A", "N/A");
                 return;
             }
 
@@ -243,8 +240,8 @@
             });
 
         } catch (error) {
-            setStatus("Network Error", "red");
-            alert("Error connecting to API!");
+            setStatus("Connection Error", "red");
+            updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
         }
     }
 
@@ -256,7 +253,7 @@
     function searchIP() {
         const inputVal = document.getElementById("ipInput").value.trim();
         if (!inputVal) {
-            alert("Please enter an IP address or domain to search.");
+            setStatus("Please enter an IP", "orange");
             return;
         }
         fetchIPDetails(inputVal);
