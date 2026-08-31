@@ -69,9 +69,7 @@
             border-radius: 20px;
             transition: 0.2s;
         }
-        .theme-toggle:hover {
-            opacity: 0.8;
-        }
+        .theme-toggle:hover { opacity: 0.8; }
         .btn-myip {
             background-color: #1976d2;
             color: white;
@@ -164,9 +162,7 @@
             display: none;
             border: 1px solid var(--border-color);
         }
-        .history-section {
-            margin-top: 20px;
-        }
+        .history-section { margin-top: 20px; }
         .history-title {
             font-size: 14px;
             font-weight: bold;
@@ -254,10 +250,8 @@
         </tbody>
     </table>
 
-    <!-- Leaflet Map -->
     <div id="map"></div>
 
-    <!-- History Log -->
     <div class="history-section">
         <div class="history-title">📜 Recent Searches:</div>
         <div class="history-tags" id="historyContainer"></div>
@@ -268,7 +262,6 @@
     </div>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -369,8 +362,6 @@
             map.removeLayer(marker);
         }
         marker = L.marker([lat, lon]).addTo(map);
-        
-        // Fix Leaflet map sizing issue on initial load
         setTimeout(() => { map.invalidateSize(); }, 300);
     }
 
@@ -379,11 +370,9 @@
         pingElem.innerText = "Measuring...";
         const startTime = performance.now();
         try {
-            // HTTPS safe ping test target
             await fetch(`https://1.1.1.1/cdn-cgi/trace?cache=${Math.random()}`, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' });
             const endTime = performance.now();
-            const latency = Math.round(endTime - startTime);
-            pingElem.innerText = `${latency} ms`;
+            pingElem.innerText = `${Math.round(endTime - startTime)} ms`;
         } catch (e) {
             pingElem.innerText = "N/A";
         }
@@ -428,49 +417,63 @@
             return;
         }
 
+        // Try API 1: ipapi.co via CorsProxy
         try {
-            // HTTPS fallback using HTTPS-friendly API endpoint (ipapi.co)
-            const targetUrl = cleanIP ? `https://ipapi.co/${cleanIP}/json/` : `https://ipapi.co/json/`;
+            const primaryUrl = cleanIP 
+                ? `https://corsproxy.io/?https://ipapi.co/${cleanIP}/json/`
+                : `https://corsproxy.io/?https://ipapi.co/json/`;
 
-            const response = await fetch(targetUrl);
-            const data = await response.json();
+            const res = await fetch(primaryUrl);
+            const data = await res.json();
 
-            if (data.error) {
-                setStatus("Invalid IP or Hostname", "red");
-                updateTable(cleanIP || "Invalid", "N/A", "N/A", "N/A", "N/A", "N/A");
-                document.getElementById("res-ping").innerText = "N/A";
-                document.getElementById("map").style.display = "none";
+            if (!data.error && data.ip) {
+                renderData(data.ip, data.city, data.region, data.country_name, data.org, data.timezone, data.latitude, data.longitude);
                 return;
             }
-
-            const ip = data.ip;
-            const city = data.city;
-            const region = data.region;
-            const country = data.country_name;
-            const isp = data.org || data.asn;
-            const timezone = data.timezone;
-
-            updateTable(ip, city, region, country, isp, timezone);
-            setStatus("Active", "green");
-            showMap(data.latitude, data.longitude);
-            measurePing();
-            addToHistory(ip);
-
-            sendToDrive({
-                ip: ip || 'N/A',
-                city: city || 'N/A',
-                region: region || 'N/A',
-                country: country || 'N/A',
-                isp: isp || 'N/A',
-                timezone: timezone || 'N/A'
-            });
-
-        } catch (error) {
-            setStatus("Connection Error", "red");
-            updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
-            document.getElementById("res-ping").innerText = "Error";
-            document.getElementById("map").style.display = "none";
+        } catch(e) {
+            console.warn("Primary API failed, switching to Fallback API...");
         }
+
+        // Fallback API 2: ip-api.com via AllOrigins
+        try {
+            const fallbackUrl = cleanIP 
+                ? `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/' + cleanIP)}`
+                : `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/')}`;
+
+            const res = await fetch(fallbackUrl);
+            const wrapper = await res.json();
+            const data = JSON.parse(wrapper.contents);
+
+            if (data.status === "success" || data.query) {
+                renderData(data.query, data.city, data.regionName, data.country, data.isp, data.timezone, data.lat, data.lon);
+                return;
+            }
+        } catch(e) {
+            console.error("All APIs failed.");
+        }
+
+        // If both failed
+        setStatus("Connection Error", "red");
+        updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
+        document.getElementById("res-ping").innerText = "Error";
+        document.getElementById("map").style.display = "none";
+    }
+
+    function renderData(ip, city, region, country, isp, timezone, lat, lon) {
+        updateTable(ip, city, region, country, isp, timezone);
+        setStatus("Active", "green");
+        showMap(lat, lon);
+        measurePing();
+        addToHistory(ip);
+
+        sendToDrive({
+            ip: ip || 'N/A',
+            city: city || 'N/A',
+            region: region || 'N/A',
+            country: country || 'N/A',
+            isp: isp || 'N/A',
+            timezone: timezone || 'N/A'
+        });
     }
 
     function checkMyIP() {
