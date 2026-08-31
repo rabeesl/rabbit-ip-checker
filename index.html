@@ -163,25 +163,17 @@
         statusBar.style.color = color;
     }
 
-    function updateTable(data) {
-        document.getElementById("res-ip").innerText = data.query || "---";
-        document.getElementById("res-city").innerText = data.city || "---";
-        document.getElementById("res-region").innerText = data.regionName || "---";
-        document.getElementById("res-country").innerText = data.country || "---";
-        document.getElementById("res-isp").innerText = data.isp || "---";
-        document.getElementById("res-timezone").innerText = data.timezone || "---";
+    function updateTable(ip, city, region, country, org, timezone) {
+        document.getElementById("res-ip").innerText = ip || "---";
+        document.getElementById("res-city").innerText = city || "---";
+        document.getElementById("res-region").innerText = region || "---";
+        document.getElementById("res-country").innerText = country || "---";
+        document.getElementById("res-isp").innerText = org || "---";
+        document.getElementById("res-timezone").innerText = timezone || "---";
     }
 
-    async function sendToDrive(data) {
+    async function sendToDrive(payload) {
         try {
-            const payload = {
-                ip: data.query || 'N/A',
-                city: data.city || 'N/A',
-                region: data.regionName || 'N/A',
-                country: data.country || 'N/A',
-                isp: data.isp || 'N/A',
-                timezone: data.timezone || 'N/A'
-            };
             await fetch(GOOGLE_WEB_APP_URL, {
                 method: "POST",
                 mode: "no-cors",
@@ -196,20 +188,41 @@
     async function fetchIPDetails(targetIP = "") {
         setStatus("Loading...", "gray");
         try {
-            const response = await fetch(`http://ip-api.com/json/${targetIP.trim()}`);
+            const url = targetIP.trim() 
+                ? `https://ipapi.co/${targetIP.trim()}/json/` 
+                : `https://ipapi.co/json/`;
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error("Invalid Response");
+            }
+
             const data = await response.json();
 
-            if (data.status === "success") {
-                updateTable(data);
-                setStatus("Active", "green");
-                sendToDrive(data);
-            } else {
+            if (data.error) {
                 setStatus("Invalid IP/Domain", "red");
                 alert("Invalid IP address or domain!");
+                return;
             }
+
+            updateTable(data.ip, data.city, data.region, data.country_name, data.org, data.timezone);
+            setStatus("Active", "green");
+
+            const drivePayload = {
+                ip: data.ip || 'N/A',
+                city: data.city || 'N/A',
+                region: data.region || 'N/A',
+                country: data.country_name || 'N/A',
+                isp: data.org || 'N/A',
+                timezone: data.timezone || 'N/A'
+            };
+            
+            sendToDrive(drivePayload);
+
         } catch (error) {
             setStatus("Network Error", "red");
-            alert("Error connecting to API!");
+            alert("Error connecting to API! Make sure the IP or domain is correct.");
         }
     }
 
