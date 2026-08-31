@@ -104,10 +104,21 @@
         }
         th { background-color: #f9f9f9; font-weight: bold; }
         .footer {
-            height: 15px;
+            height: auto;
             background-color: #d47c4e;
             margin-top: 20px;
             border-radius: 0 0 4px 4px;
+            text-align: center;
+            padding: 6px 0;
+        }
+        .footer a {
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -151,7 +162,9 @@
         </tbody>
     </table>
 
-    <div class="footer"></div>
+    <div class="footer">
+        <a href="https://guns.lol/rabeesl" target="_blank">🌐 My Profile</a>
+    </div>
 </div>
 
 <script>
@@ -197,45 +210,40 @@
         const cleanIP = targetIP.trim();
         setStatus("Loading...", "gray");
 
-        // 1. Check for Private IP Range (LAN)
         if (cleanIP && isPrivateIP(cleanIP)) {
             updateTable(cleanIP, "Local Network (LAN)", "Internal IP", "Private Network", "Local Router/Device", "System Time");
             setStatus("Local Private IP Detected", "blue");
             sendToDrive({
-                ip: cleanIP,
-                city: "Local Network",
-                region: "Internal IP",
-                country: "Private Network",
-                isp: "Local Router/Device",
-                timezone: "System Time"
+                ip: cleanIP, city: "Local Network", region: "Internal IP",
+                country: "Private Network", isp: "Local Router/Device", timezone: "System Time"
             });
             return;
         }
 
-        // 2. Fetch Public IP Details
         try {
-            const url = cleanIP 
-                ? `https://ipapi.co/${cleanIP}/json/` 
-                : `https://ipapi.co/json/`;
+            const apiUrl = cleanIP 
+                ? `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/' + cleanIP)}`
+                : `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/')}`;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            const response = await fetch(apiUrl);
+            const wrapperData = await response.json();
+            const data = JSON.parse(wrapperData.contents);
 
-            if (data.error) {
+            if (data.status === "fail") {
                 setStatus("Invalid IP or Hostname", "red");
                 updateTable(cleanIP || "Invalid", "N/A", "N/A", "N/A", "N/A", "N/A");
                 return;
             }
 
-            updateTable(data.ip, data.city, data.region, data.country_name, data.org, data.timezone);
+            updateTable(data.query, data.city, data.regionName, data.country, data.isp, data.timezone);
             setStatus("Active", "green");
 
             sendToDrive({
-                ip: data.ip || 'N/A',
+                ip: data.query || 'N/A',
                 city: data.city || 'N/A',
-                region: data.region || 'N/A',
-                country: data.country_name || 'N/A',
-                isp: data.org || 'N/A',
+                region: data.regionName || 'N/A',
+                country: data.country || 'N/A',
+                isp: data.isp || 'N/A',
                 timezone: data.timezone || 'N/A'
             });
 
