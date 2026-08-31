@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rabbit IP Checker</title>
-    <!-- Leaflet CSS for Map Integration -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -400,6 +399,27 @@
         }
     }
 
+    // Global Callback Function for JSONP Injection
+    window.handleIPResponse = function(data) {
+        if (data && (data.status === "success" || data.query)) {
+            renderData(
+                data.query,
+                data.city || "N/A",
+                data.regionName || "N/A",
+                data.country || "N/A",
+                data.isp || "N/A",
+                data.timezone || "N/A",
+                data.lat,
+                data.lon
+            );
+        } else {
+            setStatus("Connection Error", "red");
+            updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
+            document.getElementById("res-ping").innerText = "Error";
+            document.getElementById("map").style.display = "none";
+        }
+    };
+
     async function fetchIPDetails(targetIP = "") {
         const cleanIP = targetIP.trim();
         setStatus("Loading...", "gray");
@@ -417,57 +437,32 @@
             return;
         }
 
-        // Method 1: Direct HTTPS Fetch to ipwho.is
-        try {
-            const url = cleanIP ? `https://ipwho.is/${cleanIP}` : `https://ipwho.is/`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.success) {
-                renderData(
-                    data.ip,
-                    data.city,
-                    data.region,
-                    data.country,
-                    data.connection ? data.connection.isp : "N/A",
-                    data.timezone ? data.timezone.id : "N/A",
-                    data.latitude,
-                    data.longitude
-                );
-                return;
+        // If 'My IP' clicked, first get Public IP via IPify to avoid empty parameter issues
+        let queryIP = cleanIP;
+        if (!queryIP) {
+            try {
+                const ipRes = await fetch("https://api.ipify.org?format=json");
+                const ipData = await ipRes.json();
+                queryIP = ipData.ip;
+            } catch (e) {
+                console.warn("ipify failed, proceeding without IP");
             }
-        } catch (e) {
-            console.warn("ipwho.is failed, trying ipapi.co...");
         }
 
-        // Method 2: Direct Fetch to ipapi.co
-        try {
-            const url = cleanIP ? `https://ipapi.co/${cleanIP}/json/` : `https://ipapi.co/json/`;
-            const res = await fetch(url);
-            const data = await res.json();
+        // Script Tag JSONP Injection (Completely bypasses CORS)
+        const oldScript = document.getElementById("jsonpScript");
+        if (oldScript) oldScript.remove();
 
-            if (!data.error && data.ip) {
-                renderData(
-                    data.ip,
-                    data.city,
-                    data.region,
-                    data.country_name,
-                    data.org,
-                    data.timezone,
-                    data.latitude,
-                    data.longitude
-                );
-                return;
-            }
-        } catch (e) {
-            console.error("ipapi.co also failed.");
-        }
-
-        // Final Failure State
-        setStatus("Connection Error", "red");
-        updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
-        document.getElementById("res-ping").innerText = "Error";
-        document.getElementById("map").style.display = "none";
+        const script = document.createElement("script");
+        script.id = "jsonpScript";
+        script.src = `https://ip-api.com/json/${queryIP}?callback=handleIPResponse`;
+        script.onerror = function() {
+            setStatus("Connection Error", "red");
+            updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
+            document.getElementById("res-ping").innerText = "Error";
+            document.getElementById("map").style.display = "none";
+        };
+        document.body.appendChild(script);
     }
 
     function renderData(ip, city, region, country, isp, timezone, lat, lon) {
