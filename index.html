@@ -157,10 +157,10 @@
         }
         .copy-btn:hover { background: #444; }
         #map {
-            height: 200px;
+            height: 220px;
             width: 100%;
             border-radius: 6px;
-            margin-top: 10px;
+            margin-top: 15px;
             display: none;
             border: 1px solid var(--border-color);
         }
@@ -254,10 +254,10 @@
         </tbody>
     </table>
 
-    <!-- Leaflet Interactive Map Container -->
+    <!-- Leaflet Map -->
     <div id="map"></div>
 
-    <!-- Recent Search History Log -->
+    <!-- History Log -->
     <div class="history-section">
         <div class="history-title">📜 Recent Searches:</div>
         <div class="history-tags" id="historyContainer"></div>
@@ -276,7 +276,6 @@
     let map = null;
     let marker = null;
 
-    // Dark / Light Mode Toggle
     function toggleTheme() {
         const body = document.body;
         const themeBtn = document.getElementById("themeBtn");
@@ -290,13 +289,11 @@
         }
     }
 
-    // Load saved theme on startup
     if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark-mode');
         document.getElementById("themeBtn").innerText = "☀️ Light";
     }
 
-    // Copy IP to Clipboard
     function copyIP() {
         const ipText = document.getElementById("res-ip").innerText;
         if(ipText && ipText !== "---") {
@@ -319,7 +316,6 @@
         statusBar.style.color = color;
     }
 
-    // Recent History Management
     function addToHistory(ip) {
         if (!ip || ip === "---" || ip === "Error" || ip === "Invalid") return;
         let history = JSON.parse(localStorage.getItem('ipHistory') || '[]');
@@ -351,7 +347,6 @@
         });
     }
 
-    // Render Map
     function showMap(lat, lon) {
         const mapContainer = document.getElementById("map");
         if (!lat || !lon) {
@@ -374,15 +369,18 @@
             map.removeLayer(marker);
         }
         marker = L.marker([lat, lon]).addTo(map);
+        
+        // Fix Leaflet map sizing issue on initial load
+        setTimeout(() => { map.invalidateSize(); }, 300);
     }
 
-    // Ping / Latency Calculation
-    async function measurePing(ip) {
+    async function measurePing() {
         const pingElem = document.getElementById("res-ping");
         pingElem.innerText = "Measuring...";
         const startTime = performance.now();
         try {
-            await fetch(`https://httpbin.org/get?cache=${Math.random()}`, { method: 'HEAD', cache: 'no-store' });
+            // HTTPS safe ping test target
+            await fetch(`https://1.1.1.1/cdn-cgi/trace?cache=${Math.random()}`, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' });
             const endTime = performance.now();
             const latency = Math.round(endTime - startTime);
             pingElem.innerText = `${latency} ms`;
@@ -431,15 +429,13 @@
         }
 
         try {
-            const apiUrl = cleanIP 
-                ? `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/' + cleanIP)}`
-                : `https://api.allorigins.win/get?url=${encodeURIComponent('http://ip-api.com/json/')}`;
+            // HTTPS fallback using HTTPS-friendly API endpoint (ipapi.co)
+            const targetUrl = cleanIP ? `https://ipapi.co/${cleanIP}/json/` : `https://ipapi.co/json/`;
 
-            const response = await fetch(apiUrl);
-            const wrapperData = await response.json();
-            const data = JSON.parse(wrapperData.contents);
+            const response = await fetch(targetUrl);
+            const data = await response.json();
 
-            if (data.status === "fail") {
+            if (data.error) {
                 setStatus("Invalid IP or Hostname", "red");
                 updateTable(cleanIP || "Invalid", "N/A", "N/A", "N/A", "N/A", "N/A");
                 document.getElementById("res-ping").innerText = "N/A";
@@ -447,19 +443,26 @@
                 return;
             }
 
-            updateTable(data.query, data.city, data.regionName, data.country, data.isp, data.timezone);
+            const ip = data.ip;
+            const city = data.city;
+            const region = data.region;
+            const country = data.country_name;
+            const isp = data.org || data.asn;
+            const timezone = data.timezone;
+
+            updateTable(ip, city, region, country, isp, timezone);
             setStatus("Active", "green");
-            showMap(data.lat, data.lon);
-            measurePing(data.query);
-            addToHistory(data.query);
+            showMap(data.latitude, data.longitude);
+            measurePing();
+            addToHistory(ip);
 
             sendToDrive({
-                ip: data.query || 'N/A',
-                city: data.city || 'N/A',
-                region: data.regionName || 'N/A',
-                country: data.country || 'N/A',
-                isp: data.isp || 'N/A',
-                timezone: data.timezone || 'N/A'
+                ip: ip || 'N/A',
+                city: city || 'N/A',
+                region: region || 'N/A',
+                country: country || 'N/A',
+                isp: isp || 'N/A',
+                timezone: timezone || 'N/A'
             });
 
         } catch (error) {
@@ -484,7 +487,6 @@
         fetchIPDetails(inputVal);
     }
 
-    // Initialize History on Page Load
     renderHistory();
 </script>
 
