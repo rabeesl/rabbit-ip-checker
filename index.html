@@ -221,7 +221,7 @@
     <div class="search-section">
         <label>Search External IP or Domain:</label>
         <div class="search-box">
-            <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8 or 192.168.8.170">
+            <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8 or google.com">
             <button class="btn-search" onclick="searchIP()">🔍 Search IP</button>
         </div>
     </div>
@@ -399,27 +399,6 @@
         }
     }
 
-    // Global Callback Function for JSONP Injection
-    window.handleIPResponse = function(data) {
-        if (data && (data.status === "success" || data.query)) {
-            renderData(
-                data.query,
-                data.city || "N/A",
-                data.regionName || "N/A",
-                data.country || "N/A",
-                data.isp || "N/A",
-                data.timezone || "N/A",
-                data.lat,
-                data.lon
-            );
-        } else {
-            setStatus("Connection Error", "red");
-            updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
-            document.getElementById("res-ping").innerText = "Error";
-            document.getElementById("map").style.display = "none";
-        }
-    };
-
     async function fetchIPDetails(targetIP = "") {
         const cleanIP = targetIP.trim();
         setStatus("Loading...", "gray");
@@ -437,49 +416,44 @@
             return;
         }
 
-        // If 'My IP' clicked, first get Public IP via IPify to avoid empty parameter issues
-        let queryIP = cleanIP;
-        if (!queryIP) {
-            try {
-                const ipRes = await fetch("https://api.ipify.org?format=json");
-                const ipData = await ipRes.json();
-                queryIP = ipData.ip;
-            } catch (e) {
-                console.warn("ipify failed, proceeding without IP");
+        try {
+            const url = cleanIP ? `https://ipwho.is/${cleanIP}` : `https://ipwho.is/`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                const ip = data.ip;
+                const city = data.city;
+                const region = data.region;
+                const country = data.country;
+                const isp = data.connection ? data.connection.isp : "N/A";
+                const timezone = data.timezone ? data.timezone.id : "N/A";
+                const lat = data.latitude;
+                const lon = data.longitude;
+
+                updateTable(ip, city, region, country, isp, timezone);
+                setStatus("Active", "green");
+                showMap(lat, lon);
+                measurePing();
+                addToHistory(ip);
+
+                sendToDrive({
+                    ip: ip || 'N/A',
+                    city: city || 'N/A',
+                    region: region || 'N/A',
+                    country: country || 'N/A',
+                    isp: isp || 'N/A',
+                    timezone: timezone || 'N/A'
+                });
+            } else {
+                throw new Error(data.message || "API Error");
             }
-        }
-
-        // Script Tag JSONP Injection (Completely bypasses CORS)
-        const oldScript = document.getElementById("jsonpScript");
-        if (oldScript) oldScript.remove();
-
-        const script = document.createElement("script");
-        script.id = "jsonpScript";
-        script.src = `https://ip-api.com/json/${queryIP}?callback=handleIPResponse`;
-        script.onerror = function() {
+        } catch (error) {
             setStatus("Connection Error", "red");
             updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
             document.getElementById("res-ping").innerText = "Error";
             document.getElementById("map").style.display = "none";
-        };
-        document.body.appendChild(script);
-    }
-
-    function renderData(ip, city, region, country, isp, timezone, lat, lon) {
-        updateTable(ip, city, region, country, isp, timezone);
-        setStatus("Active", "green");
-        showMap(lat, lon);
-        measurePing();
-        addToHistory(ip);
-
-        sendToDrive({
-            ip: ip || 'N/A',
-            city: city || 'N/A',
-            region: region || 'N/A',
-            country: country || 'N/A',
-            isp: isp || 'N/A',
-            timezone: timezone || 'N/A'
-        });
+        }
     }
 
     function checkMyIP() {
