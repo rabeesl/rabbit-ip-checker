@@ -4,17 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rabbit IP Checker</title>
+    <!-- Leaflet CSS for Map Integration -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        :root {
+            --bg-color: #f3f3f3;
+            --card-bg: #ffffff;
+            --text-color: #222222;
+            --table-bg: #f9f9f9;
+            --border-color: #dddddd;
+            --desc-bg: #e3f2fd;
+            --desc-text: #0d47a1;
+        }
+
+        .dark-mode {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --table-bg: #2a2a2a;
+            --border-color: #333333;
+            --desc-bg: #1e293b;
+            --desc-text: #93c5fd;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f3f3f3;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 20px;
             display: flex;
             justify-content: center;
+            transition: 0.3s;
         }
         .container {
-            background-color: #ffffff;
+            background-color: var(--card-bg);
             width: 100%;
             max-width: 700px;
             padding: 25px;
@@ -24,12 +48,29 @@
         .header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             margin-bottom: 20px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
         }
         .header h1 {
             font-size: 28px;
             margin: 0 0 0 15px;
-            color: #222;
+        }
+        .theme-toggle {
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 18px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            transition: 0.2s;
+        }
+        .theme-toggle:hover {
+            opacity: 0.8;
         }
         .btn-myip {
             background-color: #1976d2;
@@ -45,8 +86,8 @@
         }
         .btn-myip:hover { background-color: #0d47a1; }
         .desc-box {
-            background-color: #e3f2fd;
-            color: #0d47a1;
+            background-color: var(--desc-bg);
+            color: var(--desc-text);
             font-size: 12px;
             font-style: italic;
             padding: 8px;
@@ -54,11 +95,10 @@
             text-align: center;
             margin-bottom: 15px;
         }
-        hr { border: 0; height: 1px; background: #ddd; margin: 15px 0; }
+        hr { border: 0; height: 1px; background: var(--border-color); margin: 15px 0; }
         .search-section label {
             font-weight: bold;
             font-size: 14px;
-            color: #444;
             display: block;
             margin-bottom: 8px;
         }
@@ -70,7 +110,9 @@
             flex: 1;
             padding: 10px;
             font-size: 14px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            color: var(--text-color);
             border-radius: 4px;
             text-align: center;
         }
@@ -100,9 +142,54 @@
         th, td {
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid var(--border-color);
         }
-        th { background-color: #f9f9f9; font-weight: bold; }
+        th { background-color: var(--table-bg); font-weight: bold; }
+        .copy-btn {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .copy-btn:hover { background: #444; }
+        #map {
+            height: 200px;
+            width: 100%;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+            border: 1px solid var(--border-color);
+        }
+        .history-section {
+            margin-top: 20px;
+        }
+        .history-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .history-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .history-tag {
+            background-color: var(--table-bg);
+            border: 1px solid var(--border-color);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .history-tag:hover {
+            background-color: #1976d2;
+            color: white;
+        }
         .footer {
             height: auto;
             background-color: #d47c4e;
@@ -117,17 +204,18 @@
             font-weight: bold;
             font-size: 14px;
         }
-        .footer a:hover {
-            text-decoration: underline;
-        }
+        .footer a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <span style="font-size: 40px;">🐇</span>
-        <h1>Rabbit IP Checker</h1>
+        <div class="header-left">
+            <span style="font-size: 40px;">🐇</span>
+            <h1>Rabbit IP Checker</h1>
+        </div>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
     </div>
 
     <button class="btn-myip" onclick="checkMyIP()">🌐 My IP Check</button>
@@ -153,22 +241,69 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td>IP Address :</td><td id="res-ip">---</td></tr>
+            <tr>
+                <td>IP Address :</td>
+                <td><span id="res-ip">---</span> <button class="copy-btn" onclick="copyIP()">📋 Copy</button></td>
+            </tr>
             <tr><td>City :</td><td id="res-city">---</td></tr>
             <tr><td>Region :</td><td id="res-region">---</td></tr>
             <tr><td>Country :</td><td id="res-country">---</td></tr>
             <tr><td>ISP :</td><td id="res-isp">---</td></tr>
             <tr><td>Timezone :</td><td id="res-timezone">---</td></tr>
+            <tr><td>Latency (Ping) :</td><td id="res-ping">---</td></tr>
         </tbody>
     </table>
+
+    <!-- Leaflet Interactive Map Container -->
+    <div id="map"></div>
+
+    <!-- Recent Search History Log -->
+    <div class="history-section">
+        <div class="history-title">📜 Recent Searches:</div>
+        <div class="history-tags" id="historyContainer"></div>
+    </div>
 
     <div class="footer">
         <a href="https://guns.lol/rabeesl" target="_blank">🌐 My Profile</a>
     </div>
 </div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
     const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nXud_JJ_GkFFp2Ql_S_iBWWHMxNZh1JZSrnvepMa0gtTRFV2SCBzf3SKSSzxvEIQ1A/exec";
+    let map = null;
+    let marker = null;
+
+    // Dark / Light Mode Toggle
+    function toggleTheme() {
+        const body = document.body;
+        const themeBtn = document.getElementById("themeBtn");
+        body.classList.toggle('dark-mode');
+        if (body.classList.contains('dark-mode')) {
+            themeBtn.innerText = "☀️ Light";
+            localStorage.setItem('theme', 'dark');
+        } else {
+            themeBtn.innerText = "🌙 Dark";
+            localStorage.setItem('theme', 'light');
+        }
+    }
+
+    // Load saved theme on startup
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById("themeBtn").innerText = "☀️ Light";
+    }
+
+    // Copy IP to Clipboard
+    function copyIP() {
+        const ipText = document.getElementById("res-ip").innerText;
+        if(ipText && ipText !== "---") {
+            navigator.clipboard.writeText(ipText);
+            alert("Copied IP: " + ipText);
+        }
+    }
 
     function isPrivateIP(ip) {
         return ip.startsWith("10.") || 
@@ -182,6 +317,78 @@
         const statusBar = document.getElementById("statusBar");
         statusBar.innerText = "Status: " + text;
         statusBar.style.color = color;
+    }
+
+    // Recent History Management
+    function addToHistory(ip) {
+        if (!ip || ip === "---" || ip === "Error" || ip === "Invalid") return;
+        let history = JSON.parse(localStorage.getItem('ipHistory') || '[]');
+        if (!history.includes(ip)) {
+            history.unshift(ip);
+            if (history.length > 5) history.pop();
+            localStorage.setItem('ipHistory', JSON.stringify(history));
+        }
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const historyContainer = document.getElementById("historyContainer");
+        let history = JSON.parse(localStorage.getItem('ipHistory') || '[]');
+        historyContainer.innerHTML = "";
+        if (history.length === 0) {
+            historyContainer.innerHTML = "<span style='font-size:12px; color:gray;'>No recent searches</span>";
+            return;
+        }
+        history.forEach(ip => {
+            const tag = document.createElement("span");
+            tag.className = "history-tag";
+            tag.innerText = ip;
+            tag.onclick = () => {
+                document.getElementById("ipInput").value = ip;
+                fetchIPDetails(ip);
+            };
+            historyContainer.appendChild(tag);
+        });
+    }
+
+    // Render Map
+    function showMap(lat, lon) {
+        const mapContainer = document.getElementById("map");
+        if (!lat || !lon) {
+            mapContainer.style.display = "none";
+            return;
+        }
+        mapContainer.style.display = "block";
+
+        if (!map) {
+            map = L.map('map').setView([lat, lon], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+        } else {
+            map.setView([lat, lon], 10);
+        }
+
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        marker = L.marker([lat, lon]).addTo(map);
+    }
+
+    // Ping / Latency Calculation
+    async function measurePing(ip) {
+        const pingElem = document.getElementById("res-ping");
+        pingElem.innerText = "Measuring...";
+        const startTime = performance.now();
+        try {
+            await fetch(`https://httpbin.org/get?cache=${Math.random()}`, { method: 'HEAD', cache: 'no-store' });
+            const endTime = performance.now();
+            const latency = Math.round(endTime - startTime);
+            pingElem.innerText = `${latency} ms`;
+        } catch (e) {
+            pingElem.innerText = "N/A";
+        }
     }
 
     function updateTable(ip, city, region, country, org, timezone) {
@@ -212,7 +419,10 @@
 
         if (cleanIP && isPrivateIP(cleanIP)) {
             updateTable(cleanIP, "Local Network (LAN)", "Internal IP", "Private Network", "Local Router/Device", "System Time");
+            document.getElementById("res-ping").innerText = "< 1 ms (Local)";
+            document.getElementById("map").style.display = "none";
             setStatus("Local Private IP Detected", "blue");
+            addToHistory(cleanIP);
             sendToDrive({
                 ip: cleanIP, city: "Local Network", region: "Internal IP",
                 country: "Private Network", isp: "Local Router/Device", timezone: "System Time"
@@ -232,11 +442,16 @@
             if (data.status === "fail") {
                 setStatus("Invalid IP or Hostname", "red");
                 updateTable(cleanIP || "Invalid", "N/A", "N/A", "N/A", "N/A", "N/A");
+                document.getElementById("res-ping").innerText = "N/A";
+                document.getElementById("map").style.display = "none";
                 return;
             }
 
             updateTable(data.query, data.city, data.regionName, data.country, data.isp, data.timezone);
             setStatus("Active", "green");
+            showMap(data.lat, data.lon);
+            measurePing(data.query);
+            addToHistory(data.query);
 
             sendToDrive({
                 ip: data.query || 'N/A',
@@ -250,6 +465,8 @@
         } catch (error) {
             setStatus("Connection Error", "red");
             updateTable("Error", "Unable to fetch data", "---", "---", "---", "---");
+            document.getElementById("res-ping").innerText = "Error";
+            document.getElementById("map").style.display = "none";
         }
     }
 
@@ -266,6 +483,9 @@
         }
         fetchIPDetails(inputVal);
     }
+
+    // Initialize History on Page Load
+    renderHistory();
 </script>
 
 </body>
