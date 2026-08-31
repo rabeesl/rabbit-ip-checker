@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rabbit IP Checker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f3f3;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #ffffff;
+            width: 100%;
+            max-width: 700px;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin: 0 0 0 15px;
+            color: #222;
+        }
+        .btn-myip {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .btn-myip:hover { background-color: #0d47a1; }
+        .desc-box {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+            font-size: 12px;
+            font-style: italic;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        hr { border: 0; height: 1px; background: #ddd; margin: 15px 0; }
+        .search-section label {
+            font-weight: bold;
+            font-size: 14px;
+            color: #444;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .btn-search {
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-search:hover { background-color: #1b5e20; }
+        .status-bar {
+            text-align: right;
+            font-family: monospace;
+            font-size: 12px;
+            color: gray;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th { background-color: #f9f9f9; font-weight: bold; }
+        .footer {
+            height: 15px;
+            background-color: #d47c4e;
+            margin-top: 20px;
+            border-radius: 0 0 4px 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span style="font-size: 40px;">🐇</span>
+        <h1>Rabbit IP Checker</h1>
+    </div>
+
+    <button class="btn-myip" onclick="checkMyIP()">🌐 My IP Check</button>
+    <div class="desc-box">💡 'My IP Check' clears the input and instantly fetches your current network's Public IP, Location & ISP details.</div>
+
+    <hr>
+
+    <div class="search-section">
+        <label>Search External IP or Domain:</label>
+        <div class="search-box">
+            <input type="text" id="ipInput" placeholder="e.g., 8.8.8.8 or google.com">
+            <button class="btn-search" onclick="searchIP()">🔍 Search IP</button>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">Status: IDLE</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Information Category</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>IP Address :</td><td id="res-ip">---</td></tr>
+            <tr><td>City :</td><td id="res-city">---</td></tr>
+            <tr><td>Region :</td><td id="res-region">---</td></tr>
+            <tr><td>Country :</td><td id="res-country">---</td></tr>
+            <tr><td>ISP :</td><td id="res-isp">---</td></tr>
+            <tr><td>Timezone :</td><td id="res-timezone">---</td></tr>
+        </tbody>
+    </table>
+
+    <div class="footer"></div>
+</div>
+
+<script>
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5nXud_JJ_GkFFp2Ql_S_iBWWHMxNZh1JZSrnvepMa0gtTRFV2SCBzf3SKSSzxvEIQ1A/exec";
+
+    function setStatus(text, color) {
+        const statusBar = document.getElementById("statusBar");
+        statusBar.innerText = "Status: " + text;
+        statusBar.style.color = color;
+    }
+
+    function updateTable(data) {
+        document.getElementById("res-ip").innerText = data.query || "---";
+        document.getElementById("res-city").innerText = data.city || "---";
+        document.getElementById("res-region").innerText = data.regionName || "---";
+        document.getElementById("res-country").innerText = data.country || "---";
+        document.getElementById("res-isp").innerText = data.isp || "---";
+        document.getElementById("res-timezone").innerText = data.timezone || "---";
+    }
+
+    async function sendToDrive(data) {
+        try {
+            const payload = {
+                ip: data.query || 'N/A',
+                city: data.city || 'N/A',
+                region: data.regionName || 'N/A',
+                country: data.country || 'N/A',
+                isp: data.isp || 'N/A',
+                timezone: data.timezone || 'N/A'
+            };
+            await fetch(GOOGLE_WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            console.error("Drive upload failed:", e);
+        }
+    }
+
+    async function fetchIPDetails(targetIP = "") {
+        setStatus("Loading...", "gray");
+        try {
+            const response = await fetch(`http://ip-api.com/json/${targetIP.trim()}`);
+            const data = await response.json();
+
+            if (data.status === "success") {
+                updateTable(data);
+                setStatus("Active", "green");
+                sendToDrive(data);
+            } else {
+                setStatus("Invalid IP/Domain", "red");
+                alert("Invalid IP address or domain!");
+            }
+        } catch (error) {
+            setStatus("Network Error", "red");
+            alert("Error connecting to API!");
+        }
+    }
+
+    function checkMyIP() {
+        document.getElementById("ipInput").value = "";
+        fetchIPDetails("");
+    }
+
+    function searchIP() {
+        const inputVal = document.getElementById("ipInput").value.trim();
+        if (!inputVal) {
+            alert("Please enter an IP address or domain to search.");
+            return;
+        }
+        fetchIPDetails(inputVal);
+    }
+</script>
+
+</body>
+</html>
